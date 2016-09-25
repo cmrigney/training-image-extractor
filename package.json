@@ -26,7 +26,7 @@
   ],
   "dependencies": {
     "electron-debug": "^1.0.0",
-    "opencv": "^5.0.0"
+    "broadwayjs": "0.0.2"
   },
   "devDependencies": {
     "devtron": "^1.1.0",
