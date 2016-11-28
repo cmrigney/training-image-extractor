@@ -3,3 +3,5 @@ node_modules
 .vscode/.browse.VC.db
 .vscode/.browse.VC.db-wal
 npm-debug.log
+app/bower_components
+samples

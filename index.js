@@ -1,5 +1,6 @@
 'use strict';
 const electron = require('electron');
+const pug = require('electron-pug')({ pretty: true}, {});
 const app = electron.app;
 
 // adds debug features like hotkeys for triggering dev tools and reload
@@ -20,7 +21,7 @@ function createMainWindow() {
 		height: 400
 	});
 
-	win.loadURL(`file://${__dirname}/index.html`);
+	win.loadURL(`file://${__dirname}/app/index.pug`);
 	win.on('closed', onClosed);
 	
 	return win;

@@ -1,0 +1,23 @@
+{
+  "name": "training-image-extractor",
+  "homepage": "https://github.com/cmrigney/training-image-extractor",
+  "authors": [
+    "cmrigney <crigney@sensourceinc.com>"
+  ],
+  "description": "Extract images for training",
+  "main": "",
+  "license": "MIT",
+  "private": true,
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "test",
+    "tests"
+  ],
+  "dependencies": {
+    "jquery": "^3.1.1",
+    "angular": "angularjs#^1.5.8",
+    "bootstrap": "^3.3.7"
+  }
+}
