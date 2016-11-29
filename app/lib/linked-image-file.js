@@ -29,6 +29,14 @@ class LinkedImageReader extends EventEmitter {
     });
   }
 
+  reset() {
+    if (!this.isOpen)
+      return this.emit('error', new Error('file not opened'));
+    
+    this.offset = 4;
+    this.currentPosition = 0;
+  }
+
   next() {
     if (!this.isOpen)
       return this.emit('error', new Error('file not opened'));

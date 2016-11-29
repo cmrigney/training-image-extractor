@@ -13,11 +13,14 @@ html(ng-app='extractor')
           canvas#vid(width='320', height='240', style='widget: 320px; height: 240px; background-color: #000000')
         .col-sm-6
           button.btn.btn-default(type='button' ng-click="openVideo()") Open Video
-          button.btn.btn-warning(type='button' ng-click="play()" ng-show="canShowNext() && !playing") Play
-          button.btn.btn-danger(type='button' ng-click="stop()" ng-show="playing") Stop
-          button.btn.btn-info(type='button' ng-click="previous()" ng-show="canShowPrevious()") Previous Frame
-          button.btn.btn-primary(type='button' ng-click="next()" ng-show="canShowNext()") Next Frame
-          button.btn.btn-success(type='button' ng-click="save()" ng-show="canShowNext() || canShowPrevious()") Save
+          button.btn.btn-warning(type='button' ng-click="play()" ng-disabled="!canShowNext() || playing") Play
+          button.btn.btn-danger(type='button' ng-click="stop()" ng-disabled="!playing") Stop
+          button.btn.btn-danger(type='button' ng-click="restart()" ng-disabled="!canShowPrevious() || playing") Reset
+      .row
+        .col-sm-6
+          button.btn.btn-info(type='button' ng-click="previous()" ng-disabled="!canShowPrevious()") Previous Frame
+          button.btn.btn-primary(type='button' ng-click="next()" ng-disabled="!canShowNext()") Next Frame
+          button.btn.btn-success(type='button' ng-click="save()" ng-disabled="!canShowNext() && !canShowPrevious()") Save
     script.
       window.$ = window.jQuery = require('./bower_components/jquery/dist/jquery.js');
     script(src='bower_components/bootstrap/dist/js/bootstrap.js')

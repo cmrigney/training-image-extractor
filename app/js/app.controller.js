@@ -97,7 +97,6 @@
         if (err)
           throw err;
 
-
         image.bitmap.data = imgData.data;
         image//.resize(24, 24, Jimp.RESIZE_BICUBIC)
              //.greyscale()
@@ -165,6 +164,11 @@
       });
 
       currentFileIndex = maxFileNum;
+    }
+
+    function restart() {
+      $scope.imageReader.reset();
+      next();
     }
 
     ////////////////
@@ -243,6 +247,7 @@
       $scope.play = play;
       $scope.stop = stop;
       $scope.save = save;
+      $scope.restart = restart;
      }
   }
 })();
