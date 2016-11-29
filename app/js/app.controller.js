@@ -15,7 +15,7 @@
     const fs = require('fs');
     const Jimp = require('jimp');
 
-    let currentFileIndex = 1;
+    let positionMatrix = [];
 
     activate();
 
@@ -89,21 +89,28 @@
     }
 
     function save() {
-      var ctx = $("#vid")[0].getContext("2d");
+      let ctx = $("#vid")[0].getContext("2d");
       drawAll(true);
-      var imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
+      let imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
+      let x = $scope.rect.x + ($scope.rect.width/2);
+      let y = $scope.rect.y + ($scope.rect.height/2);
+
+      let position = positionMatrix[Math.floor(y*3/240)][Math.floor(x*3/320)];
+      if (!position) {
+        console.error('No position found for x ' + x + ' y ' + y);
+        return;
+      }
 
       new Jimp($scope.rect.width, $scope.rect.height, function(err, image) {
         if (err)
           throw err;
 
         image.bitmap.data = imgData.data;
-        image//.resize(24, 24, Jimp.RESIZE_BICUBIC)
-             //.greyscale()
-             .write(`samples/${currentFileIndex}.png`, function(err) {
-               drawAll();
-             });
-        currentFileIndex++;
+        image.write(`samples/${position.pos}/${position.idx}.png`, function(err) {
+          drawAll();
+        });
+
+        position.idx++;
       });
     }
 
@@ -150,20 +157,44 @@
       return false;
     }
 
-    function doSetup() {
+    function makeDir(dir) {
       try {
-        fs.mkdirSync('samples');
+        fs.mkdirSync(dir);
       }
       catch(err) { }
-      var files = fs.readdirSync('samples');
-      var maxFileNum = 1;
-      files.forEach(function(f) {
-        var fidx = parseInt(f.split('.')[0]);
-        if (fidx > maxFileNum)
-          maxFileNum = fidx;
+    }
+
+    function doSetup() {
+      makeDir('samples');
+      makeDir('samples/center');
+      makeDir('samples/top');
+      makeDir('samples/left');
+      makeDir('samples/right');
+      makeDir('samples/bottom');
+      makeDir('samples/topleft');
+      makeDir('samples/topright');
+      makeDir('samples/bottomleft');
+      makeDir('samples/bottomright');
+
+      positionMatrix = [
+        [{ pos: 'topleft', idx: 0 },    { pos: 'top', idx: 0 },    { pos: 'topright', idx: 0 }],
+        [{ pos: 'left', idx: 0 },       { pos: 'center', idx: 0 }, { pos: 'right', idx: 0 }],
+        [{ pos: 'bottomleft', idx: 0 }, { pos: 'bottom', idx: 0 }, { pos: 'bottomright', idx: 0 }]
+      ];
+
+      positionMatrix.forEach(function(row) {
+        row.forEach(function(cell) {
+          var files = fs.readdirSync(`samples/${cell.pos}`);
+          var maxFileNum = 1;
+          files.forEach(function(f) {
+            var fidx = parseInt(f.split('.')[0]);
+            if (fidx >= maxFileNum)
+              maxFileNum = fidx + 1;
+          });
+          cell.idx = maxFileNum;
+        });
       });
 
-      currentFileIndex = maxFileNum;
     }
 
     function restart() {
