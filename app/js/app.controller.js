@@ -14,8 +14,14 @@
     const Readable = require('stream').Readable;
     const fs = require('fs');
     const Jimp = require('jimp');
+    const Meanshift = require('meanshift');
+
+    let meanshift = new Meanshift.Meanshift(320, 240, Meanshift.ImageType.MD_RGBA);
+    let savedOnce = false;
 
     let positionMatrix = [];
+
+    let undoStack = [];
 
     activate();
 
@@ -34,12 +40,24 @@
         var img = new Image();
         img.onload = function() {
           $scope.img = img;
-          drawAll();
           if($scope.playing) {
             if(!canShowNext())
               $scope.playing = false;
             else
               setTimeout(next, 20);
+          }
+          if (savedOnce) {
+            drawAll(true);
+            var ctx = $("#vid")[0].getContext("2d");
+            var pos = meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
+
+            $scope.rect.x = pos.x - $scope.rect.width/2;
+            $scope.rect.y = pos.y - $scope.rect.height/2;
+
+            drawAll();
+          }
+          else {
+            drawAll();
           }
           $scope.$digest();
         };
@@ -72,11 +90,15 @@
       $scope.playing = false;
     }
 
-    function next() {
+    function next(preserveStack) {
+      if (!preserveStack)
+        undoStack = [];
       $scope.imageReader.next();
     }
 
-    function previous() {
+    function previous(preserveStack) {
+      if (!preserveStack)
+        undoStack = [];
       $scope.imageReader.previous();
     }
 
@@ -88,7 +110,10 @@
       return $scope.imageReader && $scope.imageReader.getCurrentPosition()  > 1;
     }
 
-    function save() {
+    function save(goNext) {
+      if (goNext && !canShowNext())
+        return;
+
       let ctx = $("#vid")[0].getContext("2d");
       drawAll(true);
       let imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
@@ -101,13 +126,27 @@
         return;
       }
 
+      meanshift.initObject(Math.floor(x), Math.floor(y), 20, 20);
+      meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
+      savedOnce = true;
+
       new Jimp($scope.rect.width, $scope.rect.height, function(err, image) {
         if (err)
           throw err;
 
         image.bitmap.data = imgData.data;
-        image.write(`samples/${position.pos}/${position.idx}.png`, function(err) {
+        let i = position.idx;
+        image.write(`samples/${position.pos}/${i}.png`, function(err) {
           drawAll();
+
+
+          if(goNext && canShowNext()) {
+            if (undoStack > 50) {
+              undoStack.splice(0, 1); //remove the first element
+            }
+            undoStack.push(`samples/${position.pos}/${i}.png`);
+            next(true);
+          }
         });
 
         position.idx++;
@@ -124,6 +163,10 @@
       ctx.beginPath();
       ctx.rect($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
       ctx.strokeStyle = '#ff0000';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.rect($scope.rect.x + $scope.rect.width/2 - 10, $scope.rect.y + $scope.rect.height/2 - 10, 20, 20);
+      ctx.strokeStyle = '#00ff00';
       ctx.stroke();
     }
 
@@ -194,7 +237,15 @@
           cell.idx = maxFileNum;
         });
       });
+    }
 
+    function undo() {
+      if(undoStack.length === 0)
+        return;
+
+      var file = undoStack.pop();
+      fs.unlinkSync(file);
+      previous(true);
     }
 
     function restart() {
@@ -202,10 +253,19 @@
       next();
     }
 
+    function keyPressed(e) {
+      if (e.which === 115) { // s
+        save(true);
+      }
+      else if(e.which === 117) { // u
+        undo();
+      }
+    }
+
     ////////////////
 
     function activate() {
-      $scope.rect = { x: 0, y: 0, width: 20, height: 20 };
+      $scope.rect = { x: 0, y: 0, width: 30, height: 30 };
 
       var mode = null;
 
@@ -279,6 +339,11 @@
       $scope.stop = stop;
       $scope.save = save;
       $scope.restart = restart;
+
+      $(document).keypress(keyPressed);
+      $scope.$on('$destroy', function() {
+        $(document).off('keypress');
+      });
      }
   }
 })();
