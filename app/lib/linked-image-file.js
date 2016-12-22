@@ -9,23 +9,28 @@ class LinkedImageReader extends EventEmitter {
     this.filename = filename;
     this.numberOfImages = 0;
     this.currentPosition = 0;
+    this.inLastPosition = false;
   }
 
   open() {
     var buff = new Buffer(0);
-    fs.createReadStream(this.filename, { start: 0, end: 3 })
-    .on('data', d => {
-      buff = Buffer.concat([buff, d]);
-    })
-    .on('error', err => {
-      this.emit('error', err);
-    })
-    .on('end', () => {
-      this.numberOfImages = buff.readUInt32LE(0);
-      this.offset = 4;
-      this.isOpen = true;
-      this.currentPosition = 0;
-      this.emit('open');
+    fs.stat(this.filename, (err, stats) => {
+      this.filesize = stats["size"];
+
+      fs.createReadStream(this.filename, { start: 0, end: 3 })
+      .on('data', d => {
+        buff = Buffer.concat([buff, d]);
+      })
+      .on('error', err => {
+        this.emit('error', err);
+      })
+      .on('end', () => {
+        this.numberOfImages = buff.readUInt32LE(0);
+        this.offset = 4;
+        this.isOpen = true;
+        this.currentPosition = 0;
+        this.emit('open');
+      });
     });
   }
 
@@ -35,6 +40,7 @@ class LinkedImageReader extends EventEmitter {
     
     this.offset = 4;
     this.currentPosition = 0;
+    this.inLastPosition = false;
   }
 
   next() {
@@ -74,6 +80,9 @@ class LinkedImageReader extends EventEmitter {
         this.prevFileOffset = prevFileOffset;
         this.offset += 8 + filelength;
         this.currentPosition++;
+        if (this.offset >= this.filesize) {
+          this.inLastPosition = true;
+        }
         var htmlImage = `data:image/png;base64,${buff.toString('base64')}`;
         this.doingNext = false;
         this.emit('data', htmlImage);
@@ -121,6 +130,7 @@ class LinkedImageReader extends EventEmitter {
         this.offset = this.prevFileOffset + 8 + filelength;
         this.prevFileOffset = prevFileOffset;
         this.currentPosition--;
+        this.inLastPosition = false;
         var htmlImage = `data:image/png;base64,${buff.toString('base64')}`;
         this.doingPrev = false;
         this.emit('data', htmlImage);
@@ -133,7 +143,7 @@ class LinkedImageReader extends EventEmitter {
   }
 
   getNumberOfImages() {
-    return this.numberOfImages;
+    return (this.numberOfImages ? this.numberOfImages : (this.inLastPosition ? this.currentPosition : this.currentPosition + 2)); //this allows us to use even unfinished files
   }
 }
 

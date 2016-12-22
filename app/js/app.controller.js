@@ -14,8 +14,15 @@
     const Readable = require('stream').Readable;
     const fs = require('fs');
     const Jimp = require('jimp');
+    const Meanshift = require('meanshift');
 
-    let currentFileIndex = 1;
+    let meanshift = new Meanshift.Meanshift(320, 240, Meanshift.ImageType.MD_RGBA);
+    let savedOnce = false;
+
+    let positionMatrix = [];
+
+    let undoStack = [];
+    let positionStack = [];
 
     activate();
 
@@ -34,12 +41,24 @@
         var img = new Image();
         img.onload = function() {
           $scope.img = img;
-          drawAll();
           if($scope.playing) {
             if(!canShowNext())
               $scope.playing = false;
             else
               setTimeout(next, 20);
+          }
+          if (savedOnce) {
+            drawAll(true);
+            var ctx = $("#vid")[0].getContext("2d");
+            var pos = meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
+
+            $scope.rect.x = pos.x - $scope.rect.width/2;
+            $scope.rect.y = pos.y - $scope.rect.height/2;
+
+            drawAll();
+          }
+          else {
+            drawAll();
           }
           $scope.$digest();
         };
@@ -72,11 +91,20 @@
       $scope.playing = false;
     }
 
-    function next() {
+    function next(preserveStack) {
+      if (!preserveStack) {
+        undoStack = [];
+        positionStack = [];
+      }
       $scope.imageReader.next();
     }
 
-    function previous() {
+    function previous(preserveStack) {
+      if (!preserveStack) {
+        undoStack = [];
+        positionStack = [];
+      }
+      savedOnce = false;
       $scope.imageReader.previous();
     }
 
@@ -88,22 +116,48 @@
       return $scope.imageReader && $scope.imageReader.getCurrentPosition()  > 1;
     }
 
-    function save() {
-      var ctx = $("#vid")[0].getContext("2d");
+    function save(goNext) {
+      if (goNext && !canShowNext())
+        return;
+
+      let ctx = $("#vid")[0].getContext("2d");
       drawAll(true);
-      var imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
+      let imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
+      let x = $scope.rect.x + ($scope.rect.width/2);
+      let y = $scope.rect.y + ($scope.rect.height/2);
+
+      let position = positionMatrix[Math.floor(y*3/240)][Math.floor(x*3/320)];
+      if (!position) {
+        console.error('No position found for x ' + x + ' y ' + y);
+        return;
+      }
+
+      meanshift.initObject(Math.floor(x), Math.floor(y), 20, 20);
+      meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
+      savedOnce = true;
 
       new Jimp($scope.rect.width, $scope.rect.height, function(err, image) {
         if (err)
           throw err;
 
         image.bitmap.data = imgData.data;
-        image//.resize(24, 24, Jimp.RESIZE_BICUBIC)
-             //.greyscale()
-             .write(`samples/${currentFileIndex}.png`, function(err) {
-               drawAll();
-             });
-        currentFileIndex++;
+        let i = position.idx;
+        image.write(`samples/${position.pos}/${i}.png`, function(err) {
+          drawAll();
+
+
+          if(goNext && canShowNext()) {
+            if (undoStack > 50) {
+              undoStack.splice(0, 1); //remove the first element
+              positionStack.splice(0, 1);
+            }
+            undoStack.push(`samples/${position.pos}/${i}.png`);
+            positionStack.push({ x: $scope.rect.x, y: $scope.rect.y });
+            next(true);
+          }
+        });
+
+        position.idx++;
       });
     }
 
@@ -117,6 +171,10 @@
       ctx.beginPath();
       ctx.rect($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
       ctx.strokeStyle = '#ff0000';
+      ctx.stroke();
+      ctx.beginPath();
+      ctx.rect($scope.rect.x + $scope.rect.width/2 - 10, $scope.rect.y + $scope.rect.height/2 - 10, 20, 20);
+      ctx.strokeStyle = '#00ff00';
       ctx.stroke();
     }
 
@@ -150,20 +208,55 @@
       return false;
     }
 
-    function doSetup() {
+    function makeDir(dir) {
       try {
-        fs.mkdirSync('samples');
+        fs.mkdirSync(dir);
       }
       catch(err) { }
-      var files = fs.readdirSync('samples');
-      var maxFileNum = 1;
-      files.forEach(function(f) {
-        var fidx = parseInt(f.split('.')[0]);
-        if (fidx > maxFileNum)
-          maxFileNum = fidx;
-      });
+    }
 
-      currentFileIndex = maxFileNum;
+    function doSetup() {
+      makeDir('samples');
+      makeDir('samples/center');
+      makeDir('samples/top');
+      makeDir('samples/left');
+      makeDir('samples/right');
+      makeDir('samples/bottom');
+      makeDir('samples/topleft');
+      makeDir('samples/topright');
+      makeDir('samples/bottomleft');
+      makeDir('samples/bottomright');
+
+      positionMatrix = [
+        [{ pos: 'topleft', idx: 0 },    { pos: 'top', idx: 0 },    { pos: 'topright', idx: 0 }],
+        [{ pos: 'left', idx: 0 },       { pos: 'center', idx: 0 }, { pos: 'right', idx: 0 }],
+        [{ pos: 'bottomleft', idx: 0 }, { pos: 'bottom', idx: 0 }, { pos: 'bottomright', idx: 0 }]
+      ];
+
+      positionMatrix.forEach(function(row) {
+        row.forEach(function(cell) {
+          var files = fs.readdirSync(`samples/${cell.pos}`);
+          var maxFileNum = 1;
+          files.forEach(function(f) {
+            var fidx = parseInt(f.split('.')[0]);
+            if (fidx >= maxFileNum)
+              maxFileNum = fidx + 1;
+          });
+          cell.idx = maxFileNum;
+        });
+      });
+    }
+
+    function undo() {
+      if(undoStack.length === 0)
+        return;
+
+      var file = undoStack.pop();
+      var position = positionStack.pop();
+      fs.unlinkSync(file);
+      $scope.rect.x = position.x;
+      $scope.rect.y = position.y;
+      previous(true);
     }
 
     function restart() {
@@ -171,10 +264,19 @@
       next();
     }
 
+    function keyPressed(e) {
+      if (e.which === 115) { // s
+        save(true);
+      }
+      else if(e.which === 117) { // u
+        undo();
+      }
+    }
+
     ////////////////
 
     function activate() {
-      $scope.rect = { x: 0, y: 0, width: 20, height: 20 };
+      $scope.rect = { x: 0, y: 0, width: 30, height: 30 };
 
       var mode = null;
 
@@ -248,6 +350,11 @@
       $scope.stop = stop;
       $scope.save = save;
       $scope.restart = restart;
+
+      $(document).keypress(keyPressed);
+      $scope.$on('$destroy', function() {
+        $(document).off('keypress');
+      });
      }
   }
 })();

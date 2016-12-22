@@ -23,6 +23,7 @@ function createMainWindow() {
 
 	win.loadURL(`file://${__dirname}/app/index.pug`);
 	win.on('closed', onClosed);
+	win.setMenu(null);
 	
 	return win;
 }
