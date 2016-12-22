@@ -22,6 +22,7 @@
     let positionMatrix = [];
 
     let undoStack = [];
+    let positionStack = [];
 
     activate();
 
@@ -91,14 +92,19 @@
     }
 
     function next(preserveStack) {
-      if (!preserveStack)
+      if (!preserveStack) {
         undoStack = [];
+        positionStack = [];
+      }
       $scope.imageReader.next();
     }
 
     function previous(preserveStack) {
-      if (!preserveStack)
+      if (!preserveStack) {
         undoStack = [];
+        positionStack = [];
+      }
+      savedOnce = false;
       $scope.imageReader.previous();
     }
 
@@ -143,8 +149,10 @@
           if(goNext && canShowNext()) {
             if (undoStack > 50) {
               undoStack.splice(0, 1); //remove the first element
+              positionStack.splice(0, 1);
             }
             undoStack.push(`samples/${position.pos}/${i}.png`);
+            positionStack.push({ x: $scope.rect.x, y: $scope.rect.y });
             next(true);
           }
         });
@@ -244,7 +252,10 @@
         return;
 
       var file = undoStack.pop();
+      var position = positionStack.pop();
       fs.unlinkSync(file);
+      $scope.rect.x = position.x;
+      $scope.rect.y = position.y;
       previous(true);
     }
 
