@@ -24,6 +24,8 @@
     let undoStack = [];
     let positionStack = [];
 
+    let globalIdx = 1;
+
     activate();
 
     function reset() {
@@ -116,15 +118,55 @@
       return $scope.imageReader && $scope.imageReader.getCurrentPosition()  > 1;
     }
 
+    function ensureBounds(r)
+    {
+      if(r.x < 0 || r.y < 0)
+        throw null;
+
+      let x = r.x < 0 ? 0 : r.x;
+      let y = r.y < 0 ? 0 : r.y;
+
+      let width = r.x + r.width >= 320 ? 320 - r.x - 1 : r.width;
+      let height = r.y + r.height >= 240 ? 240 - r.y - 1 : r.height;
+
+      x = Math.floor(x);
+      y = Math.floor(y);
+      width = Math.floor(width);
+      height = Math.floor(height);
+
+      //keep square
+      width = height = Math.min(width, height);
+      let wDiff = r.width - width;
+
+      if(wDiff > 0)
+      {
+        //recenter
+        x += wDiff/2;
+        y += wDiff/2;
+        width -= wDiff/2;
+        height -= wDiff/2;
+      }
+
+      return {
+        x: x,
+        y: y,
+        width: width,
+        height: height
+      };
+    }
+
     function save(goNext) {
       if (goNext && !canShowNext())
         return;
 
       let ctx = $("#vid")[0].getContext("2d");
       drawAll(true);
-      let imgData = ctx.getImageData($scope.rect.x, $scope.rect.y, $scope.rect.width, $scope.rect.height);
-      let x = $scope.rect.x + ($scope.rect.width/2);
-      let y = $scope.rect.y + ($scope.rect.height/2);
+      let rect = ensureBounds($scope.rect);
+      if (!rect)
+        return drawAll();
+      let imgData = ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
+      let x = rect.x + (rect.width/2);
+      let y = rect.y + (rect.height/2);
 
       let position = positionMatrix[Math.floor(y*3/240)][Math.floor(x*3/320)];
       if (!position) {
@@ -136,13 +178,13 @@
       meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
       savedOnce = true;
 
-      new Jimp($scope.rect.width, $scope.rect.height, function(err, image) {
+      new Jimp(rect.width, rect.height, function(err, image) {
         if (err)
           throw err;
 
         image.bitmap.data = imgData.data;
-        let i = position.idx;
-        image.write(`samples/${position.pos}/${i}.png`, function(err) {
+        let i = globalIdx;//position.idx;
+        image.write(`samples/${i}.png`, function(err) {
           drawAll();
 
 
@@ -151,13 +193,14 @@
               undoStack.splice(0, 1); //remove the first element
               positionStack.splice(0, 1);
             }
-            undoStack.push(`samples/${position.pos}/${i}.png`);
-            positionStack.push({ x: $scope.rect.x, y: $scope.rect.y });
+            undoStack.push(`samples/${i}.png`);
+            positionStack.push({ x: rect.x, y: rect.y });
             next(true);
           }
         });
 
         position.idx++;
+        globalIdx++;
       });
     }
 
@@ -245,6 +288,15 @@
           cell.idx = maxFileNum;
         });
       });
+
+      var files = fs.readdirSync(`samples`);
+      var maxFileNum = 1;
+      files.forEach(function(f) {
+        var fidx = parseInt(f.split('.')[0]);
+        if (fidx >= maxFileNum)
+          maxFileNum = fidx + 1;
+      });
+      globalIdx = maxFileNum;
     }
 
     function undo() {
