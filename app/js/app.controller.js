@@ -52,7 +52,7 @@
           if (savedOnce) {
             drawAll(true);
             var ctx = $("#vid")[0].getContext("2d");
-            var pos = meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
+            var pos = meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data), 30);
 
             $scope.rect.x = pos.x - $scope.rect.width/2;
             $scope.rect.y = pos.y - $scope.rect.height/2;
@@ -120,14 +120,14 @@
 
     function ensureBounds(r)
     {
-      if(r.x < 0 || r.y < 0)
-        throw null;
-
       let x = r.x < 0 ? 0 : r.x;
       let y = r.y < 0 ? 0 : r.y;
 
-      let width = r.x + r.width >= 320 ? 320 - r.x - 1 : r.width;
-      let height = r.y + r.height >= 240 ? 240 - r.y - 1 : r.height;
+      let width = Math.ceil(r.x + r.width + 1) >= 320 ? Math.floor(320 - r.x - 1) : Math.floor(r.width);
+      let height = Math.ceil(r.y + r.height + 1) >= 240 ? Math.floor(240 - r.y - 1) : Math.floor(r.height);
+
+      width -= (x - r.x);
+      height -= (y - r.y);
 
       x = Math.floor(x);
       y = Math.floor(y);
@@ -135,6 +135,7 @@
       height = Math.floor(height);
 
       //keep square
+      /*
       width = height = Math.min(width, height);
       let wDiff = r.width - width;
 
@@ -146,6 +147,7 @@
         width -= wDiff/2;
         height -= wDiff/2;
       }
+      */
 
       return {
         x: x,
@@ -155,18 +157,51 @@
       };
     }
 
+    function pad(rect, boundedRect, data) {
+      let result = [];
+
+      for(let x = 0; x < rect.width; x++)
+        for(let y = 0; y < rect.height; y++)
+          for(let a = 0; a < 4; a++)
+            result.push(255);
+
+      let offsetX = boundedRect.x - rect.x;
+      let offsetY = boundedRect.y - rect.y;
+
+      for(let x = 0; x < boundedRect.width; x++) {
+        for(let y = 0; y < boundedRect.height; y++) {
+          let ry = offsetY + y;
+          let rx = offsetX + x;
+          for(let a = 0; a < 4; a++) {
+            result[(ry*rect.width + rx)*4 + a] = data[(y*boundedRect.width + x)*4 + a];
+          }
+        }
+      }
+
+      return result;
+    }
+
+    function floorRect(r) {
+      r.x = Math.floor(r.x);
+      r.y = Math.floor(r.y);
+      r.width = Math.floor(r.width);
+      r.height = Math.floor(r.height);
+    }
+
     function save(goNext) {
       if (goNext && !canShowNext())
         return;
 
       let ctx = $("#vid")[0].getContext("2d");
       drawAll(true);
+      floorRect($scope.rect);
       let rect = ensureBounds($scope.rect);
       if (!rect)
         return drawAll();
       let imgData = ctx.getImageData(rect.x, rect.y, rect.width, rect.height);
-      let x = rect.x + (rect.width/2);
-      let y = rect.y + (rect.height/2);
+      let imgArray = pad($scope.rect, rect, imgData.data.slice(0)); //copy
+      let x = Math.floor($scope.rect.x + (rect.width/2));
+      let y = Math.floor($scope.rect.y + (rect.height/2));
 
       let position = positionMatrix[Math.floor(y*3/240)][Math.floor(x*3/320)];
       if (!position) {
@@ -178,11 +213,11 @@
       meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data));
       savedOnce = true;
 
-      new Jimp(rect.width, rect.height, function(err, image) {
+      new Jimp(Math.floor($scope.rect.width), Math.floor($scope.rect.height), function(err, image) {
         if (err)
           throw err;
 
-        image.bitmap.data = imgData.data;
+        image.bitmap.data = imgArray;
         let i = globalIdx;//position.idx;
         image.write(`samples/${i}.png`, function(err) {
           drawAll();
@@ -194,7 +229,7 @@
               positionStack.splice(0, 1);
             }
             undoStack.push(`samples/${i}.png`);
-            positionStack.push({ x: rect.x, y: rect.y });
+            positionStack.push({ x: $scope.rect.x, y: $scope.rect.y });
             next(true);
           }
         });
