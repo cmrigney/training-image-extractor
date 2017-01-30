@@ -239,11 +239,61 @@
       });
     }
 
+    function equalizeHistogram (src, dst) {
+        var srcLength = src.length;
+        if (!dst) { dst = src; }
+
+        // Compute histogram and histogram sum:
+        var hist = new Float32Array(256);
+        var sum = 0;
+        for (var i = 0; i < srcLength; ++i) {
+            ++hist[~~src[i]];
+            ++sum;
+        }
+
+        // Compute integral histogram:
+        var prev = hist[0];
+        for (var i = 1; i < 256; ++i) {
+            prev = hist[i] += prev;
+        }
+
+        // Equalize image:
+        var norm = 255 / sum;
+        for (var i = 0; i < srcLength; ++i) {
+            dst[i] = hist[~~src[i]] * norm;
+        }
+        return dst;
+    }
+
+    function clipHigh(src, val) {
+      for(let i =0; i < src.length; i++) {
+        if(src[i] > val) {
+          src[i] = val;
+        }
+      }
+    }
+    function clipLow(src, val) {
+      for(let i =0; i < src.length; i++) {
+        if(src[i] < val) {
+          src[i] = val;
+        }
+      }
+    }
+
+    $scope.normChanged = drawAll;
+
     function drawAll(excludeRect) {
       if (!$scope.img)
         return;
       var ctx = $("#vid")[0].getContext("2d");
       ctx.drawImage($scope.img, 0, 0);
+      if($scope.normalize) {
+        let data = ctx.getImageData(0, 0, 320, 240);
+        clipHigh(data.data, 230);
+        clipLow(data.data, 60);
+        equalizeHistogram(data.data);
+        ctx.putImageData(data, 0, 0);
+      }
       if(excludeRect)
         return;
       ctx.beginPath();
