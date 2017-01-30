@@ -50,7 +50,7 @@
               setTimeout(next, 20);
           }
           if (savedOnce) {
-            drawAll(true);
+            drawAll(true, true);
             var ctx = $("#vid")[0].getContext("2d");
             var pos = meanshift.track(new Buffer(ctx.getImageData(0, 0, 320, 240).data), 30);
 
@@ -193,7 +193,7 @@
         return;
 
       let ctx = $("#vid")[0].getContext("2d");
-      drawAll(true);
+      drawAll(true, true);
       floorRect($scope.rect);
       let rect = ensureBounds($scope.rect);
       if (!rect)
@@ -282,12 +282,12 @@
 
     $scope.normChanged = drawAll;
 
-    function drawAll(excludeRect) {
+    function drawAll(excludeRect, noNormalize) {
       if (!$scope.img)
         return;
       var ctx = $("#vid")[0].getContext("2d");
       ctx.drawImage($scope.img, 0, 0);
-      if($scope.normalize) {
+      if($scope.normalize && !noNormalize) {
         let data = ctx.getImageData(0, 0, 320, 240);
         clipHigh(data.data, 230);
         clipLow(data.data, 60);
