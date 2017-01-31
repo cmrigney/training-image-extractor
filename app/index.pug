@@ -4,31 +4,44 @@ html(ng-app='extractor')
     meta(charset='utf-8')
     title Electron boilerplate
     link(rel='stylesheet', href='bower_components/bootstrap/dist/css/bootstrap.css')
+    link(rel='stylesheet', href='vendor/css/bootstrap-slider.css')
     link(rel='stylesheet', href='css/index.css')
     script(src='bower_components/angular/angular.js')
   body(ng-cloak='' ng-controller="appController")
     .container
+      .loading(ng-show="imageReader.seeking")
       .row
-        .col-sm-6
+        .col-xs-6
           canvas#vid(width='320', height='240', style='widget: 320px; height: 240px; background-color: #000000')
-        .col-sm-6
-          button.btn.btn-default(type='button' ng-click="openVideo()") Open Video
-          button.btn.btn-warning(type='button' ng-click="play()" ng-disabled="!canShowNext() || playing") Play
-          button.btn.btn-danger(type='button' ng-click="stop()" ng-disabled="!playing") Stop
-          button.btn.btn-danger(type='button' ng-click="restart()" ng-disabled="!canShowPrevious() || playing") Reset
-      .row
         .col-xs-6
-          button.btn.btn-info(type='button' ng-click="previous()" ng-disabled="!canShowPrevious()") Previous Frame
-          button.btn.btn-primary(type='button' ng-click="next()" ng-disabled="!canShowNext()") Next Frame
-          button.btn.btn-success(type='button' ng-click="save()" ng-disabled="!canShowNext() && !canShowPrevious()") Save
-        .col-xs-6
-          .checkbox
-            label
-              input(type='checkbox', ng-model="normalize", ng-change="normChanged()")
-              | Normalize
+          .row
+            button.btn.btn-default(type='button' ng-click="openVideo()") Open Video
+            button.btn.btn-warning(type='button' ng-click="play()" ng-disabled="!canShowNext() || playing") Play
+            button.btn.btn-danger(type='button' ng-click="stop()" ng-disabled="!playing") Stop
+            button.btn.btn-danger(type='button' ng-click="restart()" ng-disabled="!canShowPrevious() || playing") Reset
+          .row
+            button.btn.btn-info(type='button' ng-click="previous()" ng-disabled="!canShowPrevious()") Previous Frame
+            button.btn.btn-primary(type='button' ng-click="next()" ng-disabled="!canShowNext()") Next Frame
+            button.btn.btn-success(type='button' ng-click="save()" ng-disabled="!canShowNext() && !canShowPrevious()") Save
+          .row
+            .col-xs-6
+              .checkbox
+                label
+                  input(type='checkbox' ng-model="normalize" ng-change="normChanged()")
+                  | Normalize
+            .col-xs-6
+              .row
+                span Frame {{ imageReader.currentPosition }} of {{ imageReader.numberOfImages || '?' }}
+          .row
+            .col-xs-12
+              span Seek
+            .col-xs-12
+              slider(ng-model="sliderValue" min="sliderMin" step="sliderStep" max="(imageReader.numberOfImages || 1)" value="sliderVal" on-stop-slide="seek($event, value)")
     script.
       window.$ = window.jQuery = require('./bower_components/jquery/dist/jquery.js');
     script(src='bower_components/bootstrap/dist/js/bootstrap.js')
+    script(src='vendor/js/bootstrap-slider.js')
+    script(src='vendor/js/slider.js')
     script(src='js/app.js')
     script(src='js/app.controller.js')
     script.

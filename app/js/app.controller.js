@@ -43,6 +43,7 @@
         var img = new Image();
         img.onload = function() {
           $scope.img = img;
+          $scope.sliderValue = $scope.sliderVal = $scope.imageReader.getCurrentPosition();
           if($scope.playing) {
             if(!canShowNext())
               $scope.playing = false;
@@ -111,7 +112,7 @@
     }
 
     function canShowNext() {
-      return $scope.imageReader && $scope.imageReader.getCurrentPosition() < $scope.imageReader.getNumberOfImages() - 1;
+      return $scope.imageReader && $scope.imageReader.getCurrentPosition() < $scope.imageReader.getNumberOfImages();
     }
 
     function canShowPrevious() {
@@ -410,6 +411,10 @@
       }
     }
 
+    function seek(event, value) {
+      $scope.imageReader.seek(value);
+    }
+
     ////////////////
 
     function activate() {
@@ -487,6 +492,13 @@
       $scope.stop = stop;
       $scope.save = save;
       $scope.restart = restart;
+
+      $scope.sliderMin = 1;
+      $scope.sliderStep = 1;
+      $scope.sliderValue = 1;
+      $scope.sliderVal = 1;
+
+      $scope.seek = seek;
 
       $(document).keypress(keyPressed);
       $scope.$on('$destroy', function() {

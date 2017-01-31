@@ -1,1 +1,1 @@
-angular.module('extractor', []);
+angular.module('extractor', ['ui.bootstrap-slider']);

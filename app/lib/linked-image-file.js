@@ -34,6 +34,56 @@ class LinkedImageReader extends EventEmitter {
     });
   }
 
+  seek(position) {
+    if(position === this.currentPosition)
+      return;
+
+    if(position > this.numberOfImages)
+      return this.emit('error', new Error('Number of images not known'));
+    
+    if (!this.isOpen)
+      return this.emit('error', new Error('file not opened'));
+
+    if (this.doingPrev)
+      return this.emit('error', new Error('Busy rewinding'));
+    
+    if (this.doingNext)
+      return this.emit('error', new Error('Busy playing'));
+    
+    this.seeking = true;
+
+    if (this.currentPosition > position)
+      return this._seekBack(position);
+    else
+      return this._seekForward(position);
+  }
+
+  _seekBack(position) {
+    var nextPos = this.currentPosition - 1;
+    if(nextPos === position || nextPos <= 0) {
+      this.seeking = false;
+      this.previous(); //regular previous
+    }
+    else  {
+      this.previous(true, () => {
+        this._seekBack(position);
+      });
+    }
+  }
+
+  _seekForward(position) {
+    var nextPos = this.currentPosition + 1;
+    if(nextPos === position || nextPos >= this.numberOfImages) {
+      this.seeking = false;
+      this.next(); //regular next
+    }
+    else {
+      this.next(true, () => {
+        this._seekForward(position);
+      });
+    }
+  }
+
   reset() {
     if (!this.isOpen)
       return this.emit('error', new Error('file not opened'));
@@ -43,7 +93,7 @@ class LinkedImageReader extends EventEmitter {
     this.inLastPosition = false;
   }
 
-  next() {
+  next(isSeek, seekCallback) {
     if (!this.isOpen)
       return this.emit('error', new Error('file not opened'));
 
@@ -68,6 +118,17 @@ class LinkedImageReader extends EventEmitter {
       var filelength = buff.readUInt32LE(4);
       buff = new Buffer(0);
 
+      if (isSeek) {
+        this.prevFileOffset = prevFileOffset;
+        this.offset += 8 + filelength;
+        this.currentPosition++;
+        if (this.offset >= this.filesize) {
+          this.inLastPosition = true;
+        }
+        this.doingNext = false;
+        return process.nextTick(seekCallback);
+      }
+
       fs.createReadStream(this.filename, { start: this.offset + 8, end: this.offset + 8 + filelength - 1 })
       .on('data', d => {
         buff = Buffer.concat([buff, d]);
@@ -90,7 +151,7 @@ class LinkedImageReader extends EventEmitter {
     });
   }
 
-  previous() {
+  previous(isSeek, seekCallback) {
     if (!this.isOpen)
       return this.emit('error', new Error('file not opened'));
 
@@ -117,6 +178,15 @@ class LinkedImageReader extends EventEmitter {
       var prevFileOffset = buff.readUInt32LE(0);
       var filelength = buff.readUInt32LE(4);
       buff = new Buffer(0);
+
+      if(isSeek) {
+        this.offset = this.prevFileOffset + 8 + filelength;
+        this.prevFileOffset = prevFileOffset;
+        this.currentPosition--;
+        this.inLastPosition = false;
+        this.doingPrev = false;
+        return process.nextTick(seekCallback);
+      }
 
       fs.createReadStream(this.filename, { start: this.prevFileOffset + 8, end: this.prevFileOffset + 8 + filelength - 1 })
       .on('data', d => {
