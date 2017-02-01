@@ -319,7 +319,7 @@
         e.pageY -= html.clientTop || 0
 
       }
-      e.adjustedX = e.pageX - 15;
+      e.adjustedX = e.pageX - 30;
       e.adjustedY = e.pageY - 10;
     }
 
