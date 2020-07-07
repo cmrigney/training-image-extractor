@@ -31,7 +31,7 @@
     "meanshift": "^1.0.0"
   },
   "devDependencies": {
-    "electron": "1.4.6",
+    "electron": "9.1.0",
     "devtron": "^1.1.0",
     "electron-packager": "^7.0.0",
     "electron-prebuilt": "^1.0.1",
